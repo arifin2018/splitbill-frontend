@@ -16,15 +16,15 @@ function SplitCompletePage() {
   const allOriginalItems = receiptData?.items.map((item, index) => ({
     ...item,
     id: item.id || `${item.name.replace(/\s/g, '_').toLowerCase()}_${index}`,
-    originalQuantity: item.quantity || 1, // Quantity dari API
-    price: item.price // Harga dari API, PASTIKAN NAMA PROPERTI INI SESUAI
+    originalQuantity: parseFloat(item.quantity) || 1, // Pastikan quantity adalah number
+    price: parseFloat(item.price) || 0 // <<< PERBAIKAN DI SINI: Pastikan harga adalah number
   })) || [];
 
   // --- Ambil Total Diskon, Service Charge, dan Tax dari receiptData ---
-  const globalDiscountAmount = receiptData?.totals?.discount || 0;
-  // Sesuaikan path jika 'service_charge' ada di dalam 'totals'
-  const globalServiceChargeAmount = receiptData?.service_charge || 0; 
-  const globalTaxAmount = receiptData?.totals?.tax?.total_tax || 0;
+  // <<< PERBAIKAN DI SINI: Pastikan semua nilai ini di-parse sebagai float
+  const globalDiscountAmount = parseFloat(receiptData?.totals?.discount) || 0;
+  const globalServiceChargeAmount = parseFloat(receiptData?.service_charge) || 0; 
+  const globalTaxAmount = parseFloat(receiptData?.totals?.tax?.total_tax) || 0;
 
   // --- Hitung Total Subtotal dari SEMUA item di struk (untuk proporsi) ---
   const totalReceiptSubtotal = allOriginalItems.reduce((sum, item) => 
@@ -54,7 +54,8 @@ function SplitCompletePage() {
   const calculateSubtotal = (participant) => {
     return participant.assignedItems.reduce((sum, assigned) => {
       const item = getItemDetails(assigned.itemId);
-      return sum + (item ? (item.price || 0) * assigned.quantity : 0);
+      // Pastikan hasil perhitungan item.price * assigned.quantity adalah number
+      return sum + (item ? (parseFloat(item.price) || 0) * (parseFloat(assigned.quantity) || 0) : 0);
     }, 0);
   };
 
@@ -90,6 +91,15 @@ function SplitCompletePage() {
     const totalReceiptSubtotalAfterDiscountAndServiceCharge = totalReceiptSubtotal - globalDiscountAmount + globalServiceChargeAmount;
     // Hindari pembagian dengan nol atau nilai negatif
     if (totalReceiptSubtotalAfterDiscountAndServiceCharge <= 0) return 0;
+    
+    // <<< DEBUGGING: Coba log nilai-nilai ini
+    // console.log('DEBUG Tax Calc - participantSubtotal:', participantSubtotal);
+    // console.log('DEBUG Tax Calc - discountAmountForParticipant:', discountAmountForParticipant);
+    // console.log('DEBUG Tax Calc - serviceChargeAmountForParticipant:', serviceChargeAmountForParticipant);
+    // console.log('DEBUG Tax Calc - subtotalAfterDiscountAndServiceCharge:', subtotalAfterDiscountAndServiceCharge);
+    // console.log('DEBUG Tax Calc - totalReceiptSubtotalAfterDiscountAndServiceCharge:', totalReceiptSubtotalAfterDiscountAndServiceCharge);
+    // console.log('DEBUG Tax Calc - globalTaxAmount:', globalTaxAmount);
+
 
     return (subtotalAfterDiscountAndServiceCharge / totalReceiptSubtotalAfterDiscountAndServiceCharge) * globalTaxAmount;
   };
@@ -100,11 +110,16 @@ function SplitCompletePage() {
     const discountAmountForParticipant = calculateDiscountAmount(participant);
     const serviceChargeAmountForParticipant = calculateServiceChargeAmountForParticipant(participant);
     const taxAmountForParticipant = calculateTaxAmountForParticipant(participant);
-
+    
     let total = subtotal;
     total -= discountAmountForParticipant;
     total += serviceChargeAmountForParticipant;
+    // <<< DEBUGGING: Coba log nilai total sebelum dan sesudah penambahan tax
+    // console.log('DEBUG Owed Calc - total before tax:', total);
     total += taxAmountForParticipant;
+    // console.log('DEBUG Owed Calc - total after tax:', total);
+    // console.log('DEBUG Owed Calc - taxAmountForParticipant:', taxAmountForParticipant);
+
     total += (participant.additionalFees || 0);
 
     return total;

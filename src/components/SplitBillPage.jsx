@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   setActivePerson,
   assignItemToPerson,
-  resetSplitBillState
+  resetSplitBillState // Pastikan ini juga sudah diatur di Redux actions/reducers Anda
 } from '../redux/actions/splitBillActions';
 
 function SplitBillPage() {
@@ -15,27 +15,6 @@ function SplitBillPage() {
   const { receiptData, originalImageUrl } = useSelector((state) => state.receipt);
   const friends = useSelector((state) => state.friends.friends);
   const { activePersonId, personAssignments } = useSelector((state) => state.splitBill);
-
-  // --- Inisialisasi Data (Jika tidak ada data, redirect atau tampilkan pesan) ---
-  useEffect(() => {
-    if (!receiptData || !receiptData.items || receiptData.items.length === 0) {
-      console.warn('No receipt data found in Redux. Redirecting to receipt upload.');
-      navigate('/');
-      return;
-    }
-    if (!friends || friends.length === 0) {
-      console.warn('No friends added in Redux. Redirecting to add friends page.');
-      navigate('/add_friends');
-      return;
-    }
-    if (!activePersonId && friends.length > 0) {
-      dispatch(setActivePerson(friends[0].id));
-    }
-  }, [receiptData, friends, activePersonId, dispatch, navigate]);
-
-  useEffect(()=>{
-    console.log(receiptData);
-  })
 
   // Persiapkan data items untuk digunakan di UI
   const items = receiptData?.items.map((item,index) => ({
@@ -93,9 +72,52 @@ function SplitBillPage() {
     return totalAssigned.toFixed(2);
   };
 
+  // --- Pindahkan perhitungan ini ke atas, sebelum useEffect yang menggunakannya ---
   const grandTotal = calculateGrandTotal();
   const totalAssignedByEveryone = calculateTotalAssignedByEveryone();
   const remainingTotal = (parseFloat(grandTotal) - parseFloat(totalAssignedByEveryone)).toFixed(2);
+
+  // --- Inisialisasi Data (Jika tidak ada data, redirect atau tampilkan pesan) ---
+  useEffect(() => {
+    if (!receiptData || !receiptData.items || receiptData.items.length === 0) {
+      console.warn('No receipt data found in Redux. Redirecting to receipt upload.');
+      navigate('/');
+      return;
+    }
+    if (!friends || friends.length === 0) {
+      console.warn('No friends added in Redux. Redirecting to add friends page.');
+      navigate('/add_friends');
+      return;
+    }
+    if (!activePersonId && friends.length > 0) {
+      dispatch(setActivePerson(friends[0].id));
+    }
+  }, [receiptData, friends, activePersonId, dispatch, navigate]);
+
+  useEffect(()=>{
+    console.log(receiptData);
+  })
+
+  // --- Konfirmasi saat refresh/keluar halaman ---
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      // Hanya tampilkan konfirmasi jika masih ada item yang belum dibagi habis
+      if (remainingTotal !== '0.00') {
+        const message = 'Anda memiliki item yang belum dibagi. Apakah Anda yakin ingin meninggalkan halaman ini?';
+        event.returnValue = message; // Standar untuk browser
+        return message; // Untuk kompatibilitas yang lebih luas
+      }
+      return undefined; // Jangan tampilkan konfirmasi jika semua sudah dibagi
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Cleanup: Hapus event listener saat komponen di-unmount
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [remainingTotal]); // Dependency array: jalankan ulang efek jika remainingTotal berubah
+
 
   // --- Event Handlers ---
   const handleAssignItem = (itemId, change) => {
