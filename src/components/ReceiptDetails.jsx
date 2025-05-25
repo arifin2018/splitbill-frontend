@@ -21,9 +21,15 @@ function ReceiptDetails() {
     items: [],
   };
 
+  // State untuk melacak apakah ada perubahan yang belum disimpan
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+
   useEffect(() => {
     if (receiptData) {
       setEditedReceipt(JSON.parse(JSON.stringify(receiptData)));
+      // Reset status perubahan saat data diinisialisasi dari Redux
+      setHasUnsavedChanges(false);
     } else if (!loading) {
       console.warn('No receipt data found in Redux. Redirecting to upload page.');
       navigate('/');
@@ -33,7 +39,50 @@ function ReceiptDetails() {
     }
   }, [receiptData, loading, error, navigate]);
 
+
+  // --- NEW useEffect for beforeunload event ---
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      // Periksa apakah ada perubahan yang belum disimpan DAN sedang dalam mode editing
+      // Ini penting agar tidak selalu muncul pop-up
+      if (hasUnsavedChanges && isEditing) {
+        event.preventDefault();
+        event.returnValue = ''; // Standard practice for cross-browser compatibility
+        return ''; // Display a confirmation message to the user
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges, isEditing]); // Depend on hasUnsavedChanges and isEditing
+
+
+  // Update hasUnsavedChanges state when editedReceipt changes
+  useEffect(() => {
+    // Membandingkan editedReceipt dengan receiptData dari Redux
+    // Gunakan JSON.stringify untuk deep comparison sederhana.
+    // Untuk objek yang lebih kompleks dan performa, pertimbangkan library seperti 'lodash.isequal'
+    if (editedReceipt && receiptData) {
+      setHasUnsavedChanges(JSON.stringify(editedReceipt) !== JSON.stringify(receiptData));
+    } else {
+      setHasUnsavedChanges(false);
+    }
+  }, [editedReceipt, receiptData]);
+
+
   const handleStartNewBill = () => {
+    // Tambahkan konfirmasi hanya jika ada perubahan yang belum disimpan
+    if (hasUnsavedChanges) {
+      const confirmDiscard = window.confirm(
+        "You have unsaved changes. Are you sure you want to start a new bill and discard changes?"
+      );
+      if (!confirmDiscard) {
+        return; // Hentikan fungsi jika user membatalkan
+      }
+    }
     dispatch(clearReceiptData());
     navigate('/');
   };
@@ -41,13 +90,12 @@ function ReceiptDetails() {
   const displayedReceipt = receiptData || defaultReceipt;
 
   const totalItems = displayedReceipt.items.length;
-  const payment = parseFloat(displayedReceipt.totals.payment) || 0.00; // Sudah diperbaiki sebelumnya
+  const payment = parseFloat(displayedReceipt.totals.payment) || 0.00;
 
   const headerHeight = 60;
   const footerHeight = 60;
-  const scrollableHeight = `calc(100vh - ${headerHeight}px - ${footerHeight}px)`;
+  const scrollableHeight = `calc(90vh - ${headerHeight}px - ${footerHeight}px)`;
 
-  // --- Handlers untuk mode edit (ini sudah cukup bagus karena input type="number" akan memastikan number) ---
   const handleInputChange = (e, path, type = 'text') => {
     const { value } = e.target;
     setEditedReceipt(prevReceipt => {
@@ -90,11 +138,13 @@ function ReceiptDetails() {
   const handleSave = () => {
     dispatch(setEditedReceiptData(editedReceipt));
     setIsEditing(false);
+    setHasUnsavedChanges(false); // Setelah disimpan, tidak ada lagi perubahan yang belum disimpan
   };
 
   const handleCancel = () => {
     setEditedReceipt(JSON.parse(JSON.stringify(receiptData)));
     setIsEditing(false);
+    setHasUnsavedChanges(false); // Setelah dibatalkan, tidak ada lagi perubahan yang belum disimpan
   };
 
   if (loading || editedReceipt === null) {
@@ -246,9 +296,7 @@ function ReceiptDetails() {
                     onChange={(e) => handleInputChange(e, 'totals.total', 'float')}
                   />
                 ) : (
-                  // --- PERBAIKI BAGIAN INI ---
                   <p className="text-gray-800">{(parseFloat(displayedReceipt.totals.total) || 0).toFixed(2)}</p>
-                  // --- AKHIR PERBAIKAN ---
                 )}
               </div>
               {/* Discount */}
@@ -263,9 +311,7 @@ function ReceiptDetails() {
                     onChange={(e) => handleInputChange(e, 'totals.discount', 'float')}
                   />
                 ) : (
-                  // --- PERBAIKI BAGIAN INI ---
                   <p className="text-gray-800">{(parseFloat(displayedReceipt.totals.discount) || 0).toFixed(2)}</p>
-                  // --- AKHIR PERBAIKAN ---
                 )}
               </div>
               {/* Tax */}
@@ -280,9 +326,7 @@ function ReceiptDetails() {
                     onChange={(e) => handleInputChange(e, 'totals.tax.total_tax', 'float')}
                   />
                 ) : (
-                  // --- PERBAIKI BAGIAN INI ---
                   <p className="text-gray-800">{(parseFloat(displayedReceipt.totals.tax.total_tax) || 0).toFixed(2)}</p>
-                  // --- AKHIR PERBAIKAN ---
                 )}
               </div>
               {/* Service Charge (jika ada) */}
@@ -298,9 +342,7 @@ function ReceiptDetails() {
                       onChange={(e) => handleInputChange(e, 'service_charge', 'float')}
                     />
                   ) : (
-                    // --- PERBAIKI BAGIAN INI ---
                     <p className="text-gray-800">{(parseFloat(displayedReceipt.service_charge) || 0).toFixed(2)}</p>
-                    // --- AKHIR PERBAIKAN ---
                   )}
                 </div>
               )}
@@ -317,9 +359,7 @@ function ReceiptDetails() {
                       onChange={(e) => handleInputChange(e, 'tax_amount', 'float')}
                     />
                   ) : (
-                    // --- PERBAIKI BAGIAN INI ---
                     <p className="text-gray-800">{(parseFloat(displayedReceipt.tax_amount) || 0).toFixed(2)}</p>
-                    // --- AKHIR PERBAIKAN ---
                   )}
                 </div>
               )}
@@ -365,17 +405,12 @@ function ReceiptDetails() {
                       ) : (
                         <div>
                           <p className="font-medium text-gray-800">{item.name}</p>
-                          {/* --- PERBAIKI BAGIAN INI --- */}
                           <p className="text-gray-600">IDR {(parseFloat(item.price) || 0).toFixed(2)}, Qty: {item.quantity || 1}</p>
-                          {/* --- AKHIR PERBAIKAN --- */}
                         </div>
                       )}
                     </div>
-                    {/* Tampilkan total item (jika ada di data atau dihitung) */}
                     <p className="font-semibold text-gray-800">
-                      {/* --- PERBAIKI BAGIAN INI --- */}
                       IDR {(parseFloat(item.total ? item.total.toString().replace(/,/g, "") : (parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1))).toFixed(2)}
-                      {/* --- AKHIR PERBAIKAN --- */}
                     </p>
                   </div>
                 ))
