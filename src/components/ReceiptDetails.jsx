@@ -130,26 +130,26 @@ function ReceiptDetails() {
               </div>
               <div>
                 <p className="font-medium">Total</p>
-                <p>${displayedReceipt.totals.total}</p>
+                <p>{displayedReceipt.totals.total}</p>
               </div>
               <div>
                 <p className="font-medium">Discount</p>
-                <p>${displayedReceipt.totals.discount || 0}</p>
+                <p>{displayedReceipt.totals.discount || 0}</p>
               </div>
               <div>
                 <p className="font-medium">Tax</p>
-                <p>${displayedReceipt.totals.tax.total_tax || 0}</p>
+                <p>{displayedReceipt.totals.tax.total_tax || 0}</p>
               </div>
               {displayedReceipt.service_charge && (
                 <div>
                   <p className="font-medium">Service Charge</p>
-                  <p>${displayedReceipt.service_charge}</p>
+                  <p>{displayedReceipt.service_charge}</p>
                 </div>
               )}
               {displayedReceipt.tax_amount && (
                 <div>
                   <p className="font-medium">Tax</p>
-                  <p>${displayedReceipt.tax_amount}</p>
+                  <p>{displayedReceipt.tax_amount}</p>
                 </div>
               )}
             </div>
@@ -164,7 +164,7 @@ function ReceiptDetails() {
                   <div key={item.id || `item-${i}`} className="flex justify-between">
                     <div>
                       <p className="font-medium">{item.name}</p>
-                      <p>${item.price ? item.price : 'N/A'}, Quantity: {item.quantity || 1}</p>
+                      <p>IDR {item.price ? item.price : 'N/A'}, Quantity: {item.quantity || 1}</p>
                     </div>
                     <p className="font-semibold">{(Number(item.total.replace(/,/g, "")))}</p>
                   </div>

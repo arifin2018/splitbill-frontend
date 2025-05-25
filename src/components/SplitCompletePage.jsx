@@ -192,7 +192,7 @@ function SplitCompletePage() {
             </svg>
             <p className="text-lg">Total</p>
           </div>
-          <p className="text-sm text-gray-600 ml-8">You paid ${grandTotalAssigned.toFixed(0)}</p>
+          <p className="text-sm text-gray-600 ml-8">You paid IDR: {grandTotalAssigned.toFixed(0)}</p>
         </div>
 
         {/* Scrollable Participant Sections */}
@@ -230,7 +230,7 @@ function SplitCompletePage() {
                       />
                     </svg>
                     <p className="text-md">Total</p>
-                    <span className="ml-auto font-bold">${calculateTotalOwed(participant).toFixed(0)}</span>
+                    <span className="ml-auto font-bold">IDR {calculateTotalOwed(participant).toFixed(0)}</span>
                   </div>
 
                   {/* Rincian Item Participant */}
@@ -242,7 +242,7 @@ function SplitCompletePage() {
                         return (
                           <li key={index} className="flex justify-between text-gray-700 text-sm mb-1">
                             <span>{item.name} x{assigned.quantity}</span>
-                            <span>${((item.price || 0) * assigned.quantity).toFixed(0)}</span>
+                            <span>{((item.price || 0) * assigned.quantity).toFixed(0)}</span>
                           </li>
                         );
                       })}
@@ -253,26 +253,26 @@ function SplitCompletePage() {
                   <ul className="list-none p-0 mt-3 border-t border-gray-200 pt-3 text-sm text-gray-600">
                     <li className="flex justify-between mb-1">
                       <span>Subtotal</span>
-                      <span>${calculateSubtotal(participant).toFixed(0)}</span>
+                      <span>{calculateSubtotal(participant).toFixed(0)}</span>
                     </li>
                     {/* Baris Diskon */}
                     {globalDiscountAmount > 0 && calculateDiscountAmount(participant) > 0 && (
                       <li className="flex justify-between mb-1 text-red-500 font-semibold">
                         <span>Discount</span>
-                        <span>-${calculateDiscountAmount(participant).toFixed(0)}</span>
+                        <span>-{calculateDiscountAmount(participant).toFixed(0)}</span>
                       </li>
                     )}
                     {/* Tampilkan Tax & Service Charge jika totalnya > 0 */}
                     {calculateTaxAndServiceCharge(participant) > 0 && (
                       <li className="flex justify-between mb-1">
                         <span>Tax & Service Charge</span>
-                        <span>${calculateTaxAndServiceCharge(participant).toFixed(0)}</span>
+                        <span>{calculateTaxAndServiceCharge(participant).toFixed(0)}</span>
                       </li>
                     )}
                     {participant.additionalFees > 0 && (
                       <li className="flex justify-between mb-1">
                         <span>Other Fees</span>
-                        <span>${participant.additionalFees.toFixed(0)}</span>
+                        <span>{participant.additionalFees.toFixed(0)}</span>
                       </li>
                     )}
                   </ul>

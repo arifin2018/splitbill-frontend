@@ -213,7 +213,7 @@ function SplitBillPage() {
                           <p className="text-gray-700 font-medium">{item.name}</p>
                           <p className="text-sm text-gray-500">
                             {item.originalQuantity} 
-                            item{item.originalQuantity > 1 ? 's' : ''}, ${(item.price || 0)}
+                            item{item.originalQuantity > 1 ? 's' : ''}, IDR {(item.price || 0)}
                           </p>
                           {currentRemainingQuantity < item.originalQuantity && (
                             <p className="text-xs text-blue-500">
@@ -271,7 +271,7 @@ function SplitBillPage() {
                         <div>
                           <p className="text-gray-700 font-medium">{person.name}</p>
                           <p className="text-sm text-gray-500">
-                            ${calculateTotalOwed(person)}
+                            {calculateTotalOwed(person)}
                           </p>
                           {Object.keys(person.assignedItems).length > 0 && (
                             <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-1">
@@ -298,16 +298,16 @@ function SplitBillPage() {
         <div className="p-4 bg-white rounded-b-lg shadow-sm flex-none">
           <div className="flex justify-between items-center mb-4">
             <p className="text-gray-800 text-lg font-semibold">Total:</p>
-            <p className="text-gray-800 text-lg font-semibold">${grandTotal}</p>
+            <p className="text-gray-800 text-lg font-semibold">IDR {grandTotal}</p>
           </div>
           <div className="flex justify-between items-center mb-4">
             <p className="text-gray-600 text-sm">Assigned:</p>
-            <p className="text-gray-600 text-sm">${totalAssignedByEveryone}</p>
+            <p className="text-gray-600 text-sm">{totalAssignedByEveryone}</p>
           </div>
           <div className="flex justify-between items-center mb-4">
             <p className="text-gray-600 text-sm">Remaining:</p>
             <p className={`text-sm font-semibold ${ remainingTotal === '0.00' ? 'text-green-600' : 'text-red-600'}`}>
-                ${remainingTotal}
+                {remainingTotal}
             </p>
           </div>
           <div className="flex space-x-3 mt-4">
