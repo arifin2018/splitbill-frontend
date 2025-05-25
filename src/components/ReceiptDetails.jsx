@@ -1,18 +1,30 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux'; // Import useSelector
+import { useDispatch, useSelector } from 'react-redux';
+import { setEditedReceiptData, clearReceiptData } from '../redux/actions/receiptActions';
 
 function ReceiptDetails() {
   const navigate = useNavigate();
-  const dispatch = useDispatch(); // Dapatkan fungsi dispatch
+  const dispatch = useDispatch();
 
-
-  // Mengambil data resi dan originalImageUrl dari Redux store
   const { receiptData, loading, error, originalImageUrl } = useSelector((state) => state.receipt);
 
-  // Efek untuk menangani jika data tidak ada atau ada error
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedReceipt, setEditedReceipt] = useState(null);
+
+  const defaultReceipt = {
+    image_url: 'https://via.placeholder.com/300x200?text=Receipt+Image',
+    store_information: { store_name: 'Unknown Shop', address: 'N/A' },
+    transaction_information: { date: 'N/A' },
+    totals: { total: 0.00, discount: 0.00, tax: { total_tax: 0.00 }, payment: 0.00 },
+    service_charge: 0.00,
+    items: [],
+  };
+
   useEffect(() => {
-    if (!receiptData && !loading) {
+    if (receiptData) {
+      setEditedReceipt(JSON.parse(JSON.stringify(receiptData)));
+    } else if (!loading) {
       console.warn('No receipt data found in Redux. Redirecting to upload page.');
       navigate('/');
     }
@@ -21,32 +33,71 @@ function ReceiptDetails() {
     }
   }, [receiptData, loading, error, navigate]);
 
-  const defaultReceipt = {
-    image_url: 'https://via.placeholder.com/300x200?text=Receipt+Image', // Ini akan menjadi fallback
-    shop_name: 'Unknown Shop',
-    shop_address: 'N/A',
-    date: 'N/A',
-    total_amount: 0.00,
-    items: [],
-  };
-
-  // --- Fungsi untuk mereset Redux store dan navigasi ---
   const handleStartNewBill = () => {
-    dispatch({ type: 'app/resetStore' }); // Dispatch aksi reset
-    navigate('/'); // Kemudian navigasi ke halaman utama
+    dispatch(clearReceiptData());
+    navigate('/');
   };
 
   const displayedReceipt = receiptData || defaultReceipt;
 
-  // const totalItems = displayedReceipt.items.reduce((sum, item) => sum + (item.quantity || 1), 0);
   const totalItems = displayedReceipt.items.length;
-  const payment = displayedReceipt.totals.payment || 0.00;
+  const payment = parseFloat(displayedReceipt.totals.payment) || 0.00; // Sudah diperbaiki sebelumnya
 
   const headerHeight = 60;
   const footerHeight = 60;
   const scrollableHeight = `calc(100vh - ${headerHeight}px - ${footerHeight}px)`;
 
-  if (loading) {
+  // --- Handlers untuk mode edit (ini sudah cukup bagus karena input type="number" akan memastikan number) ---
+  const handleInputChange = (e, path, type = 'text') => {
+    const { value } = e.target;
+    setEditedReceipt(prevReceipt => {
+      const newReceipt = JSON.parse(JSON.stringify(prevReceipt));
+      let current = newReceipt;
+      const parts = path.split('.');
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!current[parts[i]]) current[parts[i]] = {};
+        current = current[parts[i]];
+      }
+      if (type === 'number' || type === 'float') {
+        current[parts[parts.length - 1]] = parseFloat(value) || 0;
+      } else if (type === 'integer') {
+        current[parts[parts.length - 1]] = parseInt(value) || 0;
+      } else {
+        current[parts[parts.length - 1]] = value;
+      }
+      return newReceipt;
+    });
+  };
+
+  const handleItemChange = (e, itemIndex, fieldName, type = 'text') => {
+    const { value } = e.target;
+    setEditedReceipt(prevReceipt => {
+      const newReceipt = JSON.parse(JSON.stringify(prevReceipt));
+      const newItem = { ...newReceipt.items[itemIndex] };
+
+      if (type === 'number' || type === 'float') {
+        newItem[fieldName] = parseFloat(value) || 0;
+      } else if (type === 'integer') {
+        newItem[fieldName] = parseInt(value) || 0;
+      } else {
+        newItem[fieldName] = value;
+      }
+      newReceipt.items[itemIndex] = newItem;
+      return newReceipt;
+    });
+  };
+
+  const handleSave = () => {
+    dispatch(setEditedReceiptData(editedReceipt));
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditedReceipt(JSON.parse(JSON.stringify(receiptData)));
+    setIsEditing(false);
+  };
+
+  if (loading || editedReceipt === null) {
     return (
       <div className="fixed inset-0 z-50 flex justify-center items-center bg-white">
         <p className="text-lg font-semibold text-gray-700">Loading receipt details...</p>
@@ -74,22 +125,47 @@ function ReceiptDetails() {
         {/* Header */}
         <div className="flex-none flex justify-between items-center p-4 border-b bg-white h-12 md:h-16">
           <h2 className="text-xl font-semibold text-gray-800">Receipt details</h2>
-          <button className="text-gray-500 hover:text-gray-700 flex items-center" onClick={handleStartNewBill}>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
+          <div className="flex items-center">
+            {isEditing ? (
+              <>
+                <button
+                  className="text-green-500 hover:text-green-700 mr-2 font-semibold"
+                  onClick={handleSave}
+                >
+                  Save
+                </button>
+                <button
+                  className="text-gray-500 hover:text-gray-700 mr-2 font-semibold"
+                  onClick={handleCancel}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                className="text-blue-500 hover:text-blue-700 mr-2 font-semibold"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit
+              </button>
+            )}
+            <button className="text-gray-500 hover:text-gray-700 flex items-center" onClick={handleStartNewBill}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Scrollable Content */}
@@ -101,11 +177,11 @@ function ReceiptDetails() {
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Uploaded receipt</h3>
             <p className="text-sm text-gray-500 mb-2">
-              {totalItems} item{totalItems !== 1 ? 's' : ''}, Payment: {payment}
+              {totalItems} item{totalItems !== 1 ? 's' : ''}, Payment: {payment.toFixed(2)}
             </p>
             <div className="rounded-md overflow-hidden shadow-sm">
               <img
-                src={originalImageUrl || displayedReceipt.image_url} // <-- Gunakan originalImageUrl di sini
+                src={originalImageUrl || displayedReceipt.image_url}
                 alt="Uploaded Receipt"
                 className="w-full h-auto object-cover"
               />
@@ -116,40 +192,135 @@ function ReceiptDetails() {
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Details</h3>
             <div className="grid grid-cols-1 gap-2 text-sm text-gray-600">
+              {/* Shop Name */}
               <div>
                 <p className="font-medium">Shop Name</p>
-                <p>{displayedReceipt.store_information.store_name}</p>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    className="border rounded px-2 py-1 w-full text-gray-800"
+                    value={editedReceipt?.store_information?.store_name || ''}
+                    onChange={(e) => handleInputChange(e, 'store_information.store_name')}
+                  />
+                ) : (
+                  <p className="text-gray-800">{displayedReceipt.store_information.store_name}</p>
+                )}
               </div>
+              {/* Shop Address */}
               <div>
                 <p className="font-medium">Shop Address</p>
-                <p>{displayedReceipt.store_information.address}</p>
+                {isEditing ? (
+                  <textarea
+                    className="border rounded px-2 py-1 w-full text-gray-800"
+                    value={editedReceipt?.store_information?.address || ''}
+                    onChange={(e) => handleInputChange(e, 'store_information.address')}
+                    rows="2"
+                  />
+                ) : (
+                  <p className="text-gray-800">{displayedReceipt.store_information.address}</p>
+                )}
               </div>
+              {/* Date */}
               <div>
                 <p className="font-medium">Date</p>
-                <p>{displayedReceipt.transaction_information.date}</p>
+                {isEditing ? (
+                  <input
+                    type="date"
+                    className="border rounded px-2 py-1 w-full text-gray-800"
+                    value={editedReceipt?.transaction_information?.date || ''}
+                    onChange={(e) => handleInputChange(e, 'transaction_information.date')}
+                  />
+                ) : (
+                  <p className="text-gray-800">{displayedReceipt.transaction_information.date}</p>
+                )}
               </div>
+              {/* Total */}
               <div>
                 <p className="font-medium">Total</p>
-                <p>{displayedReceipt.totals.total}</p>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="border rounded px-2 py-1 w-full text-gray-800"
+                    value={editedReceipt?.totals?.total || 0}
+                    onChange={(e) => handleInputChange(e, 'totals.total', 'float')}
+                  />
+                ) : (
+                  // --- PERBAIKI BAGIAN INI ---
+                  <p className="text-gray-800">{(parseFloat(displayedReceipt.totals.total) || 0).toFixed(2)}</p>
+                  // --- AKHIR PERBAIKAN ---
+                )}
               </div>
+              {/* Discount */}
               <div>
                 <p className="font-medium">Discount</p>
-                <p>{displayedReceipt.totals.discount || 0}</p>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="border rounded px-2 py-1 w-full text-gray-800"
+                    value={editedReceipt?.totals?.discount || 0}
+                    onChange={(e) => handleInputChange(e, 'totals.discount', 'float')}
+                  />
+                ) : (
+                  // --- PERBAIKI BAGIAN INI ---
+                  <p className="text-gray-800">{(parseFloat(displayedReceipt.totals.discount) || 0).toFixed(2)}</p>
+                  // --- AKHIR PERBAIKAN ---
+                )}
               </div>
+              {/* Tax */}
               <div>
                 <p className="font-medium">Tax</p>
-                <p>{displayedReceipt.totals.tax.total_tax || 0}</p>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="border rounded px-2 py-1 w-full text-gray-800"
+                    value={editedReceipt?.totals?.tax?.total_tax || 0}
+                    onChange={(e) => handleInputChange(e, 'totals.tax.total_tax', 'float')}
+                  />
+                ) : (
+                  // --- PERBAIKI BAGIAN INI ---
+                  <p className="text-gray-800">{(parseFloat(displayedReceipt.totals.tax.total_tax) || 0).toFixed(2)}</p>
+                  // --- AKHIR PERBAIKAN ---
+                )}
               </div>
-              {displayedReceipt.service_charge && (
+              {/* Service Charge (jika ada) */}
+              {editedReceipt?.service_charge !== undefined && (
                 <div>
                   <p className="font-medium">Service Charge</p>
-                  <p>{displayedReceipt.service_charge}</p>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="border rounded px-2 py-1 w-full text-gray-800"
+                      value={editedReceipt?.service_charge || 0}
+                      onChange={(e) => handleInputChange(e, 'service_charge', 'float')}
+                    />
+                  ) : (
+                    // --- PERBAIKI BAGIAN INI ---
+                    <p className="text-gray-800">{(parseFloat(displayedReceipt.service_charge) || 0).toFixed(2)}</p>
+                    // --- AKHIR PERBAIKAN ---
+                  )}
                 </div>
               )}
-              {displayedReceipt.tax_amount && (
+              {/* Tax Amount (Jika berbeda dengan totals.tax.total_tax, atau jika Anda ingin edit terpisah) */}
+              {editedReceipt?.tax_amount !== undefined && (
                 <div>
-                  <p className="font-medium">Tax</p>
-                  <p>{displayedReceipt.tax_amount}</p>
+                  <p className="font-medium">Additional Tax Amount</p>
+                  {isEditing ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="border rounded px-2 py-1 w-full text-gray-800"
+                      value={editedReceipt?.tax_amount || 0}
+                      onChange={(e) => handleInputChange(e, 'tax_amount', 'float')}
+                    />
+                  ) : (
+                    // --- PERBAIKI BAGIAN INI ---
+                    <p className="text-gray-800">{(parseFloat(displayedReceipt.tax_amount) || 0).toFixed(2)}</p>
+                    // --- AKHIR PERBAIKAN ---
+                  )}
                 </div>
               )}
             </div>
@@ -159,14 +330,53 @@ function ReceiptDetails() {
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Items</h3>
             <div className="grid grid-cols-1 gap-2 text-sm text-gray-600">
-              {displayedReceipt.items && displayedReceipt.items.length > 0 ? (
-                displayedReceipt.items.map((item, i) => (
-                  <div key={item.id || `item-${i}`} className="flex justify-between">
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p>IDR {item.price ? item.price : 'N/A'}, Quantity: {item.quantity || 1}</p>
+              {editedReceipt?.items && editedReceipt.items.length > 0 ? (
+                editedReceipt.items.map((item, i) => (
+                  <div key={item.id || `item-${i}`} className="flex justify-between items-center border p-2 rounded-md">
+                    <div className="flex-grow mr-2">
+                      {isEditing ? (
+                        <>
+                          <input
+                            type="text"
+                            className="border rounded px-2 py-1 w-full mb-1 text-gray-800"
+                            value={item.name || ''}
+                            onChange={(e) => handleItemChange(e, i, 'name')}
+                            placeholder="Item Name"
+                          />
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="border rounded px-2 py-1 w-1/2 text-gray-800"
+                              value={item.price || 0}
+                              onChange={(e) => handleItemChange(e, i, 'price', 'float')}
+                              placeholder="Price"
+                            />
+                            <input
+                              type="number"
+                              step="1"
+                              className="border rounded px-2 py-1 w-1/2 text-gray-800"
+                              value={item.quantity || 1}
+                              onChange={(e) => handleItemChange(e, i, 'quantity', 'integer')}
+                              placeholder="Quantity"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div>
+                          <p className="font-medium text-gray-800">{item.name}</p>
+                          {/* --- PERBAIKI BAGIAN INI --- */}
+                          <p className="text-gray-600">IDR {(parseFloat(item.price) || 0).toFixed(2)}, Qty: {item.quantity || 1}</p>
+                          {/* --- AKHIR PERBAIKAN --- */}
+                        </div>
+                      )}
                     </div>
-                    <p className="font-semibold">{(Number(item.total.replace(/,/g, "")))}</p>
+                    {/* Tampilkan total item (jika ada di data atau dihitung) */}
+                    <p className="font-semibold text-gray-800">
+                      {/* --- PERBAIKI BAGIAN INI --- */}
+                      IDR {(parseFloat(item.total ? item.total.toString().replace(/,/g, "") : (parseFloat(item.price) || 0) * (parseFloat(item.quantity) || 1))).toFixed(2)}
+                      {/* --- AKHIR PERBAIKAN --- */}
+                    </p>
                   </div>
                 ))
               ) : (

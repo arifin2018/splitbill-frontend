@@ -1,16 +1,19 @@
+// file: src/redux/reducers/receiptReducer.js
+
 import {
   UPLOAD_RECEIPT_REQUEST,
   UPLOAD_RECEIPT_SUCCESS,
   UPLOAD_RECEIPT_FAILURE,
   CLEAR_RECEIPT_DATA,
   SET_ORIGINAL_IMAGE_URL,
+  SET_EDITED_RECEIPT_DATA, // --- Import tipe aksi baru ini ---
 } from '../actions/receiptActions';
 
 const initialState = {
   receiptData: null,
   loading: false,
   error: null,
-  originalImageUrl: null, // Tambahkan ini
+  originalImageUrl: null,
 };
 
 const receiptReducer = (state = initialState, action) => {
@@ -35,12 +38,19 @@ const receiptReducer = (state = initialState, action) => {
         receiptData: null,
         error: action.payload,
       };
-    case SET_ORIGINAL_IMAGE_URL: // Case baru
+    case SET_ORIGINAL_IMAGE_URL:
       return {
         ...state,
         originalImageUrl: action.payload,
       };
-    case CLEAR_RECEIPT_DATA: // Pastikan ini juga membersihkan originalImageUrl
+    // --- Tambahkan case ini ---
+    case SET_EDITED_RECEIPT_DATA:
+      return {
+        ...state,
+        receiptData: action.payload, // Perbarui receiptData dengan payload yang dikirim
+      };
+    // --- Akhir penambahan ---
+    case CLEAR_RECEIPT_DATA:
         return {
             ...state,
             receiptData: null,
