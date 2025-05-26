@@ -89,12 +89,30 @@ function ReceiptUpload() {
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { exact: "environment" } // Ini yang penting untuk kamera belakang
+        }
+      });
       setStream(mediaStream);
       setIsCameraActive(true);
     } catch (err) {
       console.error("Error accessing camera:", err);
-      showCustomModal("Gagal mengakses kamera. Pastikan izin kamera telah diberikan.");
+      // Tangani kasus jika kamera belakang tidak ditemukan atau izin ditolak
+      if (err.name === "NotFoundError" || err.name === "OverconstrainedError") {
+          showCustomModal("Gagal mengakses kamera belakang atau tidak ditemukan. Mencoba kamera depan...");
+          // Coba lagi dengan kamera depan sebagai fallback
+          try {
+              const mediaStreamFront = await navigator.mediaDevices.getUserMedia({ video: true });
+              setStream(mediaStreamFront);
+              setIsCameraActive(true);
+          } catch (frontErr) {
+              console.error("Error accessing front camera:", frontErr);
+              showCustomModal("Gagal mengakses kamera. Pastikan izin kamera telah diberikan.");
+          }
+      } else {
+          showCustomModal("Gagal mengakses kamera. Pastikan izin kamera telah diberikan.");
+      }
     }
   };
 
