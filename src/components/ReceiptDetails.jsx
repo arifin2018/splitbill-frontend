@@ -171,7 +171,7 @@ function ReceiptDetails() {
 
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-center bg-white">
-      <div className="flex flex-col rounded-lg shadow-xl w-full max-w-md h-screen md:h-auto">
+      <div className="flex flex-col rounded-lg shadow-xl w-full max-w-md md:h-screen h-[90vh]">
         {/* Header */}
         <div className="flex-none flex justify-between items-center p-4 border-b bg-white h-12 md:h-16">
           <h2 className="text-xl font-semibold text-gray-800">Receipt details</h2>
