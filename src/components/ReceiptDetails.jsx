@@ -152,36 +152,36 @@ function ReceiptDetails() {
   };
 
   const handleSave = () => {
-    // Ambil nilai pajak yang sedang di-edit (dari editedReceipt) untuk ditampilkan
     const currentTaxInEditedReceipt = parseFloat(editedReceipt?.totals?.tax?.amount) || parseFloat(editedReceipt?.totals?.tax?.total_tax) || 0;
-    setOriginalTaxForDisplay(currentTaxInEditedReceipt); // Ini yang penting!
+    setOriginalTaxForDisplay(currentTaxInEditedReceipt);
 
-    const totalDisplayValue = parseFloat(editedReceipt?.totals?.total) || 0;
+    // const totalDisplayValue = parseFloat(editedReceipt?.totals?.total) || 0;
     const dppFromTax = parseFloat(editedReceipt?.totals?.tax?.dpp);
 
     let finalEditedReceipt = { ...editedReceipt };
 
-    const hasUniqueDpp = !(isNaN(dppFromTax) || dppFromTax === 0 || dppFromTax === totalDisplayValue);
+    // Kondisi untuk mereset pajak: jika DPP tidak ada (null/undefined), atau 0
+    // DAN jika ada pajak yang terdeteksi (baik total_tax atau amount)
+    const shouldResetTax = (isNaN(dppFromTax) || dppFromTax === 0) && (currentTaxInEditedReceipt > 0);
 
-    if (hasUniqueDpp) {
+    if (shouldResetTax) {
       finalEditedReceipt = {
         ...finalEditedReceipt,
         totals: {
           ...finalEditedReceipt.totals,
           tax: {
             ...finalEditedReceipt.totals.tax,
-            total_tax: 0, // Set total_tax menjadi 0
-            amount: 0,    // Set amount menjadi 0 juga, agar konsisten di Redux
+            total_tax: 0,
+            amount: 0,
           },
         },
       };
-      alert("DPP terdeteksi, pajak (Tax) telah direset menjadi 0.");
+      alert("DPP tidak terdeteksi atau 0, pajak (Tax) telah direset menjadi 0.");
     }
 
     dispatch(setEditedReceiptData(finalEditedReceipt));
     setIsEditing(false);
     setHasUnsavedChanges(false);
-    // originalTaxForDisplay TIDAK di-reset di sini ke 0, jadi tetap menampilkan nilai sebelum reset
   };
 
   const handleCancel = () => {
