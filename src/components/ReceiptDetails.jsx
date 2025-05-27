@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { setEditedReceiptData, clearReceiptData } from '../redux/actions/receiptActions';
@@ -11,25 +11,43 @@ function ReceiptDetails() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedReceipt, setEditedReceipt] = useState(null);
+  const [originalTaxForDisplay, setOriginalTaxForDisplay] = useState(0);
+
+  // useRef ini sekarang hanya untuk melacak apakah originalTaxForDisplay sudah diinisialisasi
+  // dari receiptData yang *baru* dimuat.
+  const hasInitializedTaxDisplay = useRef(false);
 
   const defaultReceipt = {
     image_url: 'https://via.placeholder.com/300x200?text=Receipt+Image',
     store_information: { store_name: 'Unknown Shop', address: 'N/A' },
     transaction_information: { date: 'N/A' },
-    totals: { total: 0.00, discount: 0.00, tax: { total_tax: 0.00 }, payment: 0.00 },
+    // Pastikan default juga memiliki 'amount' untuk konsistensi
+    totals: { total: 0.00, discount: 0.00, tax: { total_tax: 0.00, dpp: 0.00, amount: 0.00 }, payment: 0.00 },
     service_charge: 0.00,
     items: [],
   };
 
-  // State untuk melacak apakah ada perubahan yang belum disimpan
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-
+  // --- useEffect pertama: Untuk menginisialisasi editedReceipt dan originalTaxForDisplay
+  // saat receiptData dari Redux berubah (misalnya, memuat receipt baru).
   useEffect(() => {
     if (receiptData) {
+      // Inisialisasi editedReceipt dengan deep copy dari receiptData
       setEditedReceipt(JSON.parse(JSON.stringify(receiptData)));
-      // Reset status perubahan saat data diinisialisasi dari Redux
       setHasUnsavedChanges(false);
+
+      // Inisialisasi originalTaxForDisplay hanya jika receiptData berubah
+      // dan ini bukan karena editedReceipt lokal yang berubah
+      const currentTaxAmount = parseFloat(receiptData.totals.tax.amount) || parseFloat(receiptData.totals.tax.total_tax) || 0;
+
+      // Hanya set originalTaxForDisplay jika nilai dari receiptData benar-benar berbeda
+      // atau jika ini adalah pemuatan awal dan belum diset.
+      if (currentTaxAmount !== originalTaxForDisplay || !hasInitializedTaxDisplay.current) {
+         setOriginalTaxForDisplay(currentTaxAmount);
+         hasInitializedTaxDisplay.current = true;
+      }
+
     } else if (!loading) {
       console.warn('No receipt data found in Redux. Redirecting to upload page.');
       navigate('/');
@@ -37,18 +55,29 @@ function ReceiptDetails() {
     if (error) {
       console.error('Error fetching receipt details:', error);
     }
+    // Dependencies: Hanya receiptData, loading, error, navigate.
+    // editedReceipt tidak boleh ada di sini karena akan menyebabkan loop.
   }, [receiptData, loading, error, navigate]);
 
 
-  // --- NEW useEffect for beforeunload event ---
+  // --- useEffect kedua: Untuk melacak perubahan yang belum disimpan
+  useEffect(() => {
+    // Pastikan editedReceipt dan receiptData sudah ada sebelum membandingkan
+    if (editedReceipt && receiptData) {
+      setHasUnsavedChanges(JSON.stringify(editedReceipt) !== JSON.stringify(receiptData));
+    } else {
+      setHasUnsavedChanges(false);
+    }
+  }, [editedReceipt, receiptData]); // Dependencies: editedReceipt dan receiptData
+
+
+  // --- useEffect ketiga: Untuk konfirmasi saat navigasi keluar halaman
   useEffect(() => {
     const handleBeforeUnload = (event) => {
-      // Periksa apakah ada perubahan yang belum disimpan DAN sedang dalam mode editing
-      // Ini penting agar tidak selalu muncul pop-up
       if (hasUnsavedChanges && isEditing) {
         event.preventDefault();
-        event.returnValue = ''; // Standard practice for cross-browser compatibility
-        return ''; // Display a confirmation message to the user
+        event.returnValue = ''; // Standard for most browsers
+        return ''; // For some older browsers
       }
     };
 
@@ -57,30 +86,16 @@ function ReceiptDetails() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [hasUnsavedChanges, isEditing]); // Depend on hasUnsavedChanges and isEditing
-
-
-  // Update hasUnsavedChanges state when editedReceipt changes
-  useEffect(() => {
-    // Membandingkan editedReceipt dengan receiptData dari Redux
-    // Gunakan JSON.stringify untuk deep comparison sederhana.
-    // Untuk objek yang lebih kompleks dan performa, pertimbangkan library seperti 'lodash.isequal'
-    if (editedReceipt && receiptData) {
-      setHasUnsavedChanges(JSON.stringify(editedReceipt) !== JSON.stringify(receiptData));
-    } else {
-      setHasUnsavedChanges(false);
-    }
-  }, [editedReceipt, receiptData]);
+  }, [hasUnsavedChanges, isEditing]); // Dependencies: hasUnsavedChanges dan isEditing
 
 
   const handleStartNewBill = () => {
-    // Tambahkan konfirmasi hanya jika ada perubahan yang belum disimpan
     if (hasUnsavedChanges) {
       const confirmDiscard = window.confirm(
         "You have unsaved changes. Are you sure you want to start a new bill and discard changes?"
       );
       if (!confirmDiscard) {
-        return; // Hentikan fungsi jika user membatalkan
+        return;
       }
     }
     dispatch(clearReceiptData());
@@ -99,8 +114,9 @@ function ReceiptDetails() {
   const handleInputChange = (e, path, type = 'text') => {
     const { value } = e.target;
     setEditedReceipt(prevReceipt => {
-      const newReceipt = JSON.parse(JSON.stringify(prevReceipt));
-      let current = newReceipt;
+      // Pastikan prevReceipt tidak null sebelum di-parse
+      const baseReceipt = prevReceipt ? JSON.parse(JSON.stringify(prevReceipt)) : JSON.parse(JSON.stringify(defaultReceipt));
+      let current = baseReceipt;
       const parts = path.split('.');
       for (let i = 0; i < parts.length - 1; i++) {
         if (!current[parts[i]]) current[parts[i]] = {};
@@ -113,7 +129,7 @@ function ReceiptDetails() {
       } else {
         current[parts[parts.length - 1]] = value;
       }
-      return newReceipt;
+      return baseReceipt;
     });
   };
 
@@ -136,15 +152,45 @@ function ReceiptDetails() {
   };
 
   const handleSave = () => {
-    dispatch(setEditedReceiptData(editedReceipt));
+    // Ambil nilai pajak yang sedang di-edit (dari editedReceipt) untuk ditampilkan
+    const currentTaxInEditedReceipt = parseFloat(editedReceipt?.totals?.tax?.amount) || parseFloat(editedReceipt?.totals?.tax?.total_tax) || 0;
+    setOriginalTaxForDisplay(currentTaxInEditedReceipt); // Ini yang penting!
+
+    const totalDisplayValue = parseFloat(editedReceipt?.totals?.total) || 0;
+    const dppFromTax = parseFloat(editedReceipt?.totals?.tax?.dpp);
+
+    let finalEditedReceipt = { ...editedReceipt };
+
+    const hasUniqueDpp = !(isNaN(dppFromTax) || dppFromTax === 0 || dppFromTax === totalDisplayValue);
+
+    if (hasUniqueDpp) {
+      finalEditedReceipt = {
+        ...finalEditedReceipt,
+        totals: {
+          ...finalEditedReceipt.totals,
+          tax: {
+            ...finalEditedReceipt.totals.tax,
+            total_tax: 0, // Set total_tax menjadi 0
+            amount: 0,    // Set amount menjadi 0 juga, agar konsisten di Redux
+          },
+        },
+      };
+      alert("DPP terdeteksi, pajak (Tax) telah direset menjadi 0.");
+    }
+
+    dispatch(setEditedReceiptData(finalEditedReceipt));
     setIsEditing(false);
-    setHasUnsavedChanges(false); // Setelah disimpan, tidak ada lagi perubahan yang belum disimpan
+    setHasUnsavedChanges(false);
+    // originalTaxForDisplay TIDAK di-reset di sini ke 0, jadi tetap menampilkan nilai sebelum reset
   };
 
   const handleCancel = () => {
     setEditedReceipt(JSON.parse(JSON.stringify(receiptData)));
     setIsEditing(false);
-    setHasUnsavedChanges(false); // Setelah dibatalkan, tidak ada lagi perubahan yang belum disimpan
+    setHasUnsavedChanges(false);
+    // KEMBALIKAN TAMPILAN PAJAK KE NILAI 'amount' DARI REDUX SAAT CANCEL
+    const resetTaxAmount = parseFloat(receiptData?.totals?.tax?.amount) || parseFloat(receiptData?.totals?.tax?.total_tax) || 0;
+    setOriginalTaxForDisplay(resetTaxAmount);
   };
 
   if (loading || editedReceipt === null) {
@@ -168,6 +214,14 @@ function ReceiptDetails() {
       </div>
     );
   }
+
+  const totalDisplayValue = parseFloat(displayedReceipt.totals.total) || 0;
+  const dppFromTax = parseFloat(displayedReceipt.totals.tax.dpp);
+
+  const dppForTotalDisplay =
+    (isNaN(dppFromTax) || dppFromTax === 0 || dppFromTax === totalDisplayValue)
+      ? totalDisplayValue
+      : dppFromTax;
 
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-center bg-white">
@@ -296,7 +350,12 @@ function ReceiptDetails() {
                     onChange={(e) => handleInputChange(e, 'totals.total', 'float')}
                   />
                 ) : (
-                  <p className="text-gray-800">{(parseFloat(displayedReceipt.totals.total) || 0).toFixed(2)}</p>
+                  <p className="text-gray-800">
+                    Total: {totalDisplayValue.toFixed(2)}
+                    {dppForTotalDisplay !== totalDisplayValue &&
+                      `, DPP: ${dppForTotalDisplay.toFixed(2)}`
+                    }
+                  </p>
                 )}
               </div>
               {/* Discount */}
@@ -318,15 +377,21 @@ function ReceiptDetails() {
               <div>
                 <p className="font-medium">Tax</p>
                 {isEditing ? (
+                  // Saat editing, nilai diambil dari editedReceipt.totals.tax.amount atau total_tax
                   <input
                     type="number"
                     step="0.01"
                     className="border rounded px-2 py-1 w-full text-gray-800"
-                    value={editedReceipt?.totals?.tax?.total_tax || 0}
-                    onChange={(e) => handleInputChange(e, 'totals.tax.total_tax', 'float')}
+                    // Mengambil nilai dari 'amount' atau 'total_tax' untuk editing
+                    value={parseFloat(editedReceipt?.totals?.tax?.amount) || parseFloat(editedReceipt?.totals?.tax?.total_tax) || 0}
+                    // Saat mengubah, simpan ke properti 'amount'
+                    onChange={(e) => handleInputChange(e, 'totals.tax.amount', 'float')}
                   />
                 ) : (
-                  <p className="text-gray-800">{(parseFloat(displayedReceipt.totals.tax.total_tax) || 0).toFixed(2)}</p>
+                  // Saat tidak editing, nilai diambil dari originalTaxForDisplay
+                  <p className="text-gray-800">
+                    {originalTaxForDisplay.toFixed(2)}
+                  </p>
                 )}
               </div>
               {/* Service Charge (jika ada) */}
