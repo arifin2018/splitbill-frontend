@@ -13,15 +13,12 @@ function ReceiptDetails() {
   const [editedReceipt, setEditedReceipt] = useState(null);
   const [originalTaxForDisplay, setOriginalTaxForDisplay] = useState(0);
 
-  // useRef ini sekarang hanya untuk melacak apakah originalTaxForDisplay sudah diinisialisasi
-  // dari receiptData yang *baru* dimuat.
   const hasInitializedTaxDisplay = useRef(false);
 
   const defaultReceipt = {
     image_url: 'https://via.placeholder.com/300x200?text=Receipt+Image',
     store_information: { store_name: 'Unknown Shop', address: 'N/A' },
     transaction_information: { date: 'N/A' },
-    // Pastikan default juga memiliki 'amount' untuk konsistensi
     totals: { total: 0.00, discount: 0.00, tax: { total_tax: 0.00, dpp: 0.00, amount: 0.00 }, payment: 0.00 },
     service_charge: 0.00,
     items: [],
@@ -29,20 +26,13 @@ function ReceiptDetails() {
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // --- useEffect pertama: Untuk menginisialisasi editedReceipt dan originalTaxForDisplay
-  // saat receiptData dari Redux berubah (misalnya, memuat receipt baru).
   useEffect(() => {
     if (receiptData) {
-      // Inisialisasi editedReceipt dengan deep copy dari receiptData
       setEditedReceipt(JSON.parse(JSON.stringify(receiptData)));
       setHasUnsavedChanges(false);
 
-      // Inisialisasi originalTaxForDisplay hanya jika receiptData berubah
-      // dan ini bukan karena editedReceipt lokal yang berubah
       const currentTaxAmount = parseFloat(receiptData.totals.tax.amount) || parseFloat(receiptData.totals.tax.total_tax) || 0;
 
-      // Hanya set originalTaxForDisplay jika nilai dari receiptData benar-benar berbeda
-      // atau jika ini adalah pemuatan awal dan belum diset.
       if (currentTaxAmount !== originalTaxForDisplay || !hasInitializedTaxDisplay.current) {
          setOriginalTaxForDisplay(currentTaxAmount);
          hasInitializedTaxDisplay.current = true;
@@ -55,29 +45,24 @@ function ReceiptDetails() {
     if (error) {
       console.error('Error fetching receipt details:', error);
     }
-    // Dependencies: Hanya receiptData, loading, error, navigate.
-    // editedReceipt tidak boleh ada di sini karena akan menyebabkan loop.
   }, [receiptData, loading, error, navigate]);
 
 
-  // --- useEffect kedua: Untuk melacak perubahan yang belum disimpan
   useEffect(() => {
-    // Pastikan editedReceipt dan receiptData sudah ada sebelum membandingkan
     if (editedReceipt && receiptData) {
       setHasUnsavedChanges(JSON.stringify(editedReceipt) !== JSON.stringify(receiptData));
     } else {
       setHasUnsavedChanges(false);
     }
-  }, [editedReceipt, receiptData]); // Dependencies: editedReceipt dan receiptData
+  }, [editedReceipt, receiptData]);
 
 
-  // --- useEffect ketiga: Untuk konfirmasi saat navigasi keluar halaman
   useEffect(() => {
     const handleBeforeUnload = (event) => {
       if (hasUnsavedChanges && isEditing) {
         event.preventDefault();
-        event.returnValue = ''; // Standard for most browsers
-        return ''; // For some older browsers
+        event.returnValue = '';
+        return '';
       }
     };
 
@@ -86,7 +71,7 @@ function ReceiptDetails() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [hasUnsavedChanges, isEditing]); // Dependencies: hasUnsavedChanges dan isEditing
+  }, [hasUnsavedChanges, isEditing]);
 
 
   const handleStartNewBill = () => {
@@ -107,14 +92,15 @@ function ReceiptDetails() {
   const totalItems = displayedReceipt.items.length;
   const payment = parseFloat(displayedReceipt.totals.payment) || 0.00;
 
-  const headerHeight = 60;
-  const footerHeight = 60;
-  const scrollableHeight = `calc(90vh - ${headerHeight}px - ${footerHeight}px)`;
+  // REMOVE THESE HARDCODED HEIGHTS, USE flex-grow instead
+  // const headerHeight = 60;
+  // const footerHeight = 60;
+  // const scrollableHeight = `calc(90vh - ${headerHeight}px - ${footerHeight}px)`;
+
 
   const handleInputChange = (e, path, type = 'text') => {
     const { value } = e.target;
     setEditedReceipt(prevReceipt => {
-      // Pastikan prevReceipt tidak null sebelum di-parse
       const baseReceipt = prevReceipt ? JSON.parse(JSON.stringify(prevReceipt)) : JSON.parse(JSON.stringify(defaultReceipt));
       let current = baseReceipt;
       const parts = path.split('.');
@@ -160,8 +146,6 @@ function ReceiptDetails() {
 
     let finalEditedReceipt = { ...editedReceipt };
 
-    // Kondisi untuk mereset pajak: jika DPP tidak ada (null/undefined), atau 0
-    // DAN jika ada pajak yang terdeteksi (baik total_tax atau amount)
     const shouldResetTax = (isNaN(dppFromTax) || dppFromTax === 0) && (currentTaxInEditedReceipt > 0);
 
     if (shouldResetTax) {
@@ -189,7 +173,6 @@ function ReceiptDetails() {
     setEditedReceipt(JSON.parse(JSON.stringify(receiptData)));
     setIsEditing(false);
     setHasUnsavedChanges(false);
-    // KEMBALIKAN TAMPILAN PAJAK KE NILAI 'amount' DARI REDUX SAAT CANCEL
     const resetTaxAmount = parseFloat(receiptData?.totals?.tax?.amount) || parseFloat(receiptData?.totals?.tax?.total_tax) || 0;
     setOriginalTaxForDisplay(resetTaxAmount);
   };
@@ -226,7 +209,8 @@ function ReceiptDetails() {
 
   return (
     <div className="fixed inset-0 z-50 flex justify-center items-center bg-white">
-      <div className="flex flex-col rounded-lg shadow-xl w-full max-w-md md:h-screen h-[90vh]">
+      {/* Change h-[90vh] to h-screen for full height and better mobile compatibility */}
+      <div className="flex flex-col rounded-lg shadow-xl w-full max-w-md h-screen">
         {/* Header */}
         <div className="flex-none flex justify-between items-center p-4 border-b bg-white h-12 md:h-16">
           <h2 className="text-xl font-semibold text-gray-800">Receipt details</h2>
@@ -273,10 +257,11 @@ function ReceiptDetails() {
           </div>
         </div>
 
-        {/* Scrollable Content */}
+        {/* Scrollable Content - Use flex-grow here */}
         <div
           className="p-6 overflow-y-auto flex-grow"
-          style={{ maxHeight: scrollableHeight }}
+          // Remove inline style, flex-grow handles the height
+          // style={{ maxHeight: scrollableHeight }}
         >
           {/* Uploaded Receipt Image */}
           <div className="mb-4">
@@ -379,15 +364,11 @@ function ReceiptDetails() {
                 <p className="font-medium">Tax</p>
                 {isEditing ? (
                   <>
-                    {/* Log value for input */}
-                    {console.log('Rendering Tax input. editedReceipt?.totals?.tax?.amount:', editedReceipt?.totals?.tax?.amount)}
                     <input
                       type="number"
                       step="0.01"
                       className="border rounded px-2 py-1 w-full text-gray-800"
                       value={
-                        // Coba prioritaskan `editedReceipt?.totals?.tax?.amount` secara langsung tanpa parseFloat awal
-                        // jika sudah berupa string kosong atau 0.
                         editedReceipt?.totals?.tax?.amount === ''
                           ? ''
                           : (editedReceipt?.totals?.tax?.amount === 0
