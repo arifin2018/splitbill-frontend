@@ -155,7 +155,7 @@ function ReceiptDetails() {
     const currentTaxInEditedReceipt = parseFloat(editedReceipt?.totals?.tax?.amount) || parseFloat(editedReceipt?.totals?.tax?.total_tax) || 0;
     setOriginalTaxForDisplay(currentTaxInEditedReceipt);
 
-    // const totalDisplayValue = parseFloat(editedReceipt?.totals?.total) || 0;
+    const totalDisplayValue = parseFloat(editedReceipt?.totals?.total) || 0;
     const dppFromTax = parseFloat(editedReceipt?.totals?.tax?.dpp);
 
     let finalEditedReceipt = { ...editedReceipt };
@@ -183,6 +183,7 @@ function ReceiptDetails() {
     setIsEditing(false);
     setHasUnsavedChanges(false);
   };
+
 
   const handleCancel = () => {
     setEditedReceipt(JSON.parse(JSON.stringify(receiptData)));
@@ -377,18 +378,27 @@ function ReceiptDetails() {
               <div>
                 <p className="font-medium">Tax</p>
                 {isEditing ? (
-                  // Saat editing, nilai diambil dari editedReceipt.totals.tax.amount atau total_tax
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="border rounded px-2 py-1 w-full text-gray-800"
-                    // Mengambil nilai dari 'amount' atau 'total_tax' untuk editing
-                    value={parseFloat(editedReceipt?.totals?.tax?.amount) || parseFloat(editedReceipt?.totals?.tax?.total_tax) || 0}
-                    // Saat mengubah, simpan ke properti 'amount'
-                    onChange={(e) => handleInputChange(e, 'totals.tax.amount', 'float')}
-                  />
+                  <>
+                    {/* Log value for input */}
+                    {console.log('Rendering Tax input. editedReceipt?.totals?.tax?.amount:', editedReceipt?.totals?.tax?.amount)}
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="border rounded px-2 py-1 w-full text-gray-800"
+                      value={
+                        // Coba prioritaskan `editedReceipt?.totals?.tax?.amount` secara langsung tanpa parseFloat awal
+                        // jika sudah berupa string kosong atau 0.
+                        editedReceipt?.totals?.tax?.amount === ''
+                          ? ''
+                          : (editedReceipt?.totals?.tax?.amount === 0
+                              ? 0
+                              : (parseFloat(editedReceipt?.totals?.tax?.amount) || parseFloat(editedReceipt?.totals?.tax?.total_tax) || 0)
+                            )
+                      }
+                      onChange={(e) => handleInputChange(e, 'totals.tax.amount', 'float')}
+                    />
+                  </>
                 ) : (
-                  // Saat tidak editing, nilai diambil dari originalTaxForDisplay
                   <p className="text-gray-800">
                     {originalTaxForDisplay.toFixed(2)}
                   </p>
